@@ -146,13 +146,19 @@ DeleteAsset()
     local repo="${GITHUB_INFO["reponame"]}"
     local owner="${GITHUB_INFO["owner"]}"
     local oauth_token="${GITHUB_INFO["oauth_token"]}"
+    local answer
 
     if [ "$asset_id" = "" ]; then
         WARN "asset id not found for '$asset_name'."
         return 1
     fi
 
-    Info "Deleting asset '$asset_name' (id $asset_id) ... "
+    # Final chance to bypass ...
+    read -p "Delete asset '$asset_name' (Y/n)? " answer
+    case "$answer" in
+        y|Y|"") ;;
+        *) return ;;
+    esac
 
     local GITHUB_OAUTH_BASIC=""  # ??
 
@@ -168,6 +174,10 @@ Main()  # parameters: TAG assetname...
     local asset
     local asset_info_file
     local xx
+    local matched_assets=()
+
+    # Note: asset names can also be shortened, e.g. "yay-" or "downgrad".
+    # Then all assets starting with that name are deleted, so be careful.
 
     test -n "$tag" || DIE "TAG is missing."
     test -n "$1"   || DIE "Assets are missing."
@@ -182,16 +192,26 @@ Main()  # parameters: TAG assetname...
     done
     test "$tag" = "$xx" || DIE "TAG '$tag' does not exist (find with 'hub release')." "$asset_info_file"
 
-    # Check that given assets exist at github.
+    # Match given assets to github assets.
+    local github_assets="$(GetAssetNamesFromFile "$asset_info_file")"
     for asset in "$@" ; do
-        for github_asset in $(GetAssetNamesFromFile "$asset_info_file") ; do
-            test "$asset" = "$github_asset" && break
+        for github_asset in $github_assets ; do
+            case "$github_asset" in
+                ${asset}*)
+                    for xx in "${matched_assets[@]}" ; do
+                        test "$xx" = "$github_asset" && break
+                    done
+                    if [ "$xx" != "$github_asset" ] ; then
+                        matched_assets+=("$github_asset")
+                    fi
+                    ;;
+            esac
         done
-        test "$asset" = "$github_asset" || DIE "Asset '$asset' does not exist at github." "$asset_info_file"
+        test -n "$matched_assets" || DIE "Asset '$asset' does not match to any asset at github." "$asset_info_file"
     done
 
     # Now delete given assets from github.
-    for asset in "$@" ; do
+    for asset in "${matched_assets[@]}" ; do
         DeleteAsset "$asset_info_file" "$asset"
     done
 

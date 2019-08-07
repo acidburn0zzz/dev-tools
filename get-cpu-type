@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+# Identify machine's CPU type (e.g. GenuineIntel).
+
+# outputs "GenuineIntel" or something else (I don't have AMD machines...)
+
+lscpu | grep "^Vendor ID:" | awk '{print $3}'
