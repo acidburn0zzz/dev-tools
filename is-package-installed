@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Check if the given package is installed (by pacman).
+# Exit value:
+#    0 = is installed
+#    1 = not installed
+#    5 = user didn't give the package name
+
+_is_package_installed()
+{
+    local pkgname="$1"
+
+    test -n "$pkgname" || return 5
+    test -n "$(/usr/bin/pacman -Q "$pkgname" 2>/dev/null )" && return 0 || return 1
+}
+
+_is_package_installed "$@"
