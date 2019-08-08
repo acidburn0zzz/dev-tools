@@ -19,6 +19,7 @@ All input is very welcome!
 The options are (currently):
 
 Option | Description
+--- | ---
 --wireless<br>--wifi | show info about the wireless LAN device
 --display | show info about the display controller
 --vga | show info about the VGA compatible driver (note that there may be more than one graphics card)
