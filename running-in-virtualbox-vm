@@ -1,9 +1,0 @@
-#!/bin/bash
-#
-# Testing if running in a virtualbox virtual machine.
-# Exit value
-#    0 = running in vm
-#    1 = not running in vm
-#
-
-test -n "$(lspci | grep "VirtualBox Graphics Adapter")" && exit 0 || exit 1
