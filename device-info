@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# Output a one-liner info about
+#   - wireless LAN
+#   - display controller
+#   - VGA compatible controller
+#   - CPU
+# device.
+#
+# This command can be used e.g. with programs and scripts that
+# make decisions based on certain hardware.
+
+Usage() {
+    test -n "$1" && echo "Error: $1." >&2
+
+    cat <<EOF >&2
+Usage: $0 option
+where
+   --wireless
+   --wifi         shows info about the wireless LAN device
+
+   --display      shows info about the display controller
+
+   --vga          shows info about the VGA compatible controller
+
+   --cpu          shows the name of the CPU type
+EOF
+}
+
+PCI_info() {
+    local search_this="$1"
+    lspci | grep "$search_this" | sed 's|^.*'"$search_this"'||'
+}
+CPU_info() {
+    # lscpu | grep "^Vendor ID:" | awk '{print $3}'
+    grep -w "^vendor_id" /proc/cpuinfo | head -n 1 | awk '{print $3}'
+}
+
+Main()
+{
+    local search_this=""
+    local arg xx letters
+
+    test -n "$1" || { Usage "option missing" ; return 1 ; }
+
+    for arg in "$@"
+    do
+        case "$arg" in
+            --cpu)
+                CPU_info
+                ;;
+            --wireless | --wifi)
+                PCI_info " Network controller: "
+                ;;
+            --display)
+                PCI_info " Display controller: "
+                ;;
+            --vga)
+                PCI_info " VGA compatible controller: "
+                ;;
+            *)
+                Usage "unsupported option '$arg'"
+                return 1
+                ;;
+        esac
+    done
+}
+
+Main "$@"
