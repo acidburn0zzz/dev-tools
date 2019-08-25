@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Definitions for the [endeavouros] repo at 'mirrors'.
+
+# Note: this file will be sourced into a function,
+# so all variables are made 'local'.
+
+local REPONAME="endeavouros"
+local RELEASE_TAGS=(mirror1 mirror2)
+local SIGNER="EndeavourOS"
+
+local ASSETSDIR="$PWD"
+local PKGBUILD_ROOTDIR="$ASSETSDIR/PKGBUILDS"       # temporary copy only, will always be overwritten
+local GITDIR="$ASSETSDIR/../../mirrors"             # not $REPONAME...
+
+local PKGNAMES=(                                    # actually: dir names for packages
+    downgrade
+    endeavouros-keyring
+    endeavouros-mirrorlist
+    grub-theme-endeavouros
+    grub-tools
+    inxi
+    kalu
+    nvidia-installer
+    reflector-auto
+    welcome
+    yad
+    yay
+)
+
+local AUR_PKGNAMES=(  # for checking if AUR stuff is newer than local
+    aur/downgrade
+    aur/inxi
+    aur/kalu
+    aur/yad
+    aur/yay
+)
+
+CONSTRUCTOR_HOOK() {
+    # A hook function to make sure local EndeavourOS PKGBUILDS are up to date.
+
+    local dir_above_pkgbuilds="$PKGBUILD_ROOTDIR"/..
+    local conf=assets.conf
+
+    pushd "$dir_above_pkgbuilds" >/dev/null || {
+        echo "Error: $conf: cannot cd to '$dir_above_pkgbuilds'." >&2
+        exit 1
+    }
+    rm -rf "$PKGBUILD_ROOTDIR"
+    git clone https://github.com/endeavouros-team/PKGBUILDS.git >& /dev/null || {
+        echo "Error: $conf: git clone https://github.com/endeavouros-team/PKGBUILDS.git failed." >&2
+        exit 1
+    }
+    popd >/dev/null
+}
+
+# Hook functions are run in the beginning after RationalityTests in assets.make.
+# There may be several hook functions.
+local ASSET_HOOKS=(
+    CONSTRUCTOR_HOOK
+)
