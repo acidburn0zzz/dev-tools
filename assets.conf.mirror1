@@ -28,7 +28,7 @@ local PKGNAMES=(                                    # actually: dir names for pa
     yay
 )
 
-local AUR_PKGNAMES=(  # for checking if AUR stuff is newer than local
+local AUR_PKGNAMES=(
     aur/downgrade
     aur/inxi
     aur/kalu
