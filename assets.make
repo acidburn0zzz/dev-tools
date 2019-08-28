@@ -145,12 +145,12 @@ Assets_clone()
 IsEmptyString() {
     local name="$1"
     local value="${!name}"
-    test -n "$value" || DIE "$ASSETS_CONF: error: '$name' is empty."
+    test -n "$value" || DIE "value of variable '$name' is empty"
 }
 DirExists() {
     local name="$1"
     local value="${!name}"
-    test -d "$value" || DIE "$ASSETS_CONF: error: folder '$name' does not exist."
+    test -d "$value" || DIE "variable '$name' has folder name value '$value' - the folder does not exist"
 }
 
 ShowPrompt() {
@@ -176,7 +176,7 @@ RationalityTests()
     test -e "$ASSETSDIR"/.git || ln -s "$GITDIR"/.git "$ASSETSDIR"
 
     test "$GITDIR"/.git -ef "$ASSETSDIR"/.git || \
-        DIE "$ASSETS_CONF: error: folder '$ASSETSDIR/.git' differs from '$GITDIR/.git'."
+        DIE "$ASSETS_CONF: error: folder '$ASSETSDIR/.git' differs from '$GITDIR/.git'"
 
     echo2 "done."
 }
@@ -311,7 +311,7 @@ Main()
             # new pkg
             pkg="$(Build "$pkgdirname" "$buildsavedir" "$PKGBUILD_ROOTDIR/$pkgdirname")"
             case "$pkg" in
-                "") DIE "$pkgdirname: build failed." ;;
+                "") DIE "$pkgdirname: build failed" ;;
                 *)  built+=("$pkg")               ;;
             esac
         fi
