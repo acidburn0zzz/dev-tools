@@ -1,12 +1,24 @@
 #!/bin/bash
 
+PROGNAME="$(basename "$0")"
+test "$PROGNAME" = "bashdb" && PROGNAME="${BASH_ARGV[-1]}"  # could always be like this?
+
 echo2()   { echo   "$@" >&2 ; }
 printf2() { printf "$@" >&2 ; }
 
 DIE()   { echo2 "Error: $1." ; exit 1 ; }
 WARN()  { echo2 "Warning: $1." ; }
 
-TODO()  { DIE "${FUNCNAME[1]}: todo" ; }
+Usage() {
+    cat <<EOF >&2
+$PROGNAME: Build packages and transfer results to github.
+
+$PROGNAME [--checkaur]
+where
+    --checkaur    Compare certain AUR PKGBUILDs to local counterparts.
+EOF
+    test -n "$1" && exit "$1"
+}
 
 Pushd() { pushd "$@" >/dev/null || DIE "${FUNCNAME[1]}: pushd $* failed" ; }
 
@@ -94,7 +106,11 @@ ListNameToPkgName()
     elif [ "${xx::4}" = "aur/" ] ; then
         pkgname="${xx:4}"
         case "$fetch" in
-            yes) yay -Ga "$pkgname" >/dev/null || return 1 ;;
+            yes)
+                yay -Ga "$pkgname" >/dev/null || return 1
+                # AUR pkg files may need some changes:
+                test -n "${ASSET_PACKAGE_HOOKS["$pkgname"]}" && "${ASSET_PACKAGE_HOOKS["$pkgname"]}"
+                ;;
         esac
     else
         pkgname="${xx}"
@@ -181,7 +197,7 @@ RationalityTests()
     echo2 "done."
 }
 
-RunHooks()
+RunPreHooks()
 {
     if [ -n "$ASSET_HOOKS" ] ; then
         ShowPrompt "Running asset hooks"
@@ -192,6 +208,18 @@ RunHooks()
         echo2 "done."
     fi
 }
+
+#RunPostHooks()
+#{
+#    if [ -n "$ASSET_POST_HOOKS" ] ; then
+#        ShowPrompt "Running asset post hooks"
+#        local xx
+#        for xx in "${ASSET_POST_HOOKS[@]}" ; do
+#            $xx
+#        done
+#        echo2 "done."
+#    fi
+#}
 
 CompareWithAUR()  # compare certain AUR PKGBUILDs to local counterparts
 {
@@ -232,31 +260,37 @@ CompareWithAUR()  # compare certain AUR PKGBUILDs to local counterparts
 
 ASSETS_CONF=./assets.conf
 
-#### Usage: $0 [--checkaur]
-####     --checkaur    Compare certain AUR PKGBUILDs to local counterparts.
-
-
 Main()
 {
+    local cmd=""
+
+    # Check given parameters:
+    case "$1" in
+        --checkaur) cmd=checkaur ;;
+        "") ;;
+        *) Usage 0  ;;
+    esac
+
     test -r $ASSETS_CONF || DIE "cannot find local file $ASSETS_CONF"
 
     source $ASSETS_CONF         # local variables (with CAPITAL letters)
 
     RationalityTests            # check validity of values in $ASSETS_CONF
-    RunHooks                    # may/should update local PKGBUILDs
+    RunPreHooks                 # may/should update local PKGBUILDs
     Assets_clone                # offer getting assets from github instead of using local ones
 
-    if [ "$1" = "--checkaur" ] ; then
-        # Simply compare some packages with AUR. Build nothing.
-        CompareWithAUR
-        return
-    fi
+    case "$cmd" in
+        checkaur)
+            CompareWithAUR      # Simply compare some packages with AUR. Build nothing.
+            return
+            ;;
+    esac
 
     # Check if we need to build new versions of packages.
     # To do that, we compare local asset versions to PKGBUILD versions.
     # Note that
     #   - Assets_clone above may have downloaded local assets from github (if user decides it is necessary)
-    #   - RunHooks     above may/should have updated local PKGBUILDs
+    #   - RunPreHooks  above may/should have updated local PKGBUILDs
 
     local removable=()          # collected
     local removableassets=()    # collected
@@ -289,6 +323,8 @@ Main()
         echo2 "    $pkgdirname"
     done
     Popd
+
+    #RunPostHooks                 # may update local PKGBUILDs
 
     # build if newer versions exist. When building, collect removables and builds.
     buildsavedir=$(mktemp -d "$HOME/.tmpdir.XXXXX")
