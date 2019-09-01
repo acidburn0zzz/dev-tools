@@ -6,7 +6,7 @@ test "$PROGNAME" = "bashdb" && PROGNAME="${BASH_ARGV[-1]}"  # could always be li
 echo2()   { echo   "$@" >&2 ; }
 printf2() { printf "$@" >&2 ; }
 
-DIE()   { echo2 "Error: $1." ; exit 1 ; }
+DIE()   { echo2 "Error: $1." ; Destructor ; exit 1 ; }
 WARN()  { echo2 "Warning: $1." ; }
 
 Usage() {
@@ -107,7 +107,8 @@ ListNameToPkgName()
         pkgname="${xx:4}"
         case "$fetch" in
             yes)
-                yay -Ga "$pkgname" >/dev/null || return 1
+                yay -Ga "$pkgname" >/dev/null || DIE "'yay -Ga $pkgname' failed."
+                rm -rf "$pkgname"/.git                          # not needed
                 # AUR pkg files may need some changes:
                 test -n "${ASSET_PACKAGE_HOOKS["$pkgname"]}" && "${ASSET_PACKAGE_HOOKS["$pkgname"]}"
                 ;;
@@ -188,13 +189,22 @@ RationalityTests()
     DirExists PKGBUILD_ROOTDIR
     DirExists GITDIR
 
+    echo2 "done."
+}
+
+Constructor()
+{
     # make sure .git symlink exists
     test -e "$ASSETSDIR"/.git || ln -s "$GITDIR"/.git "$ASSETSDIR"
 
     test "$GITDIR"/.git -ef "$ASSETSDIR"/.git || \
         DIE "$ASSETS_CONF: error: folder '$ASSETSDIR/.git' differs from '$GITDIR/.git'"
 
-    echo2 "done."
+}
+
+Destructor()
+{
+    test -L "$ASSETSDIR"/.git && rm -f "$ASSETSDIR"/.git
 }
 
 RunPreHooks()
@@ -260,6 +270,13 @@ CompareWithAUR()  # compare certain AUR PKGBUILDs to local counterparts
 
 ASSETS_CONF=./assets.conf
 
+Exit()
+{
+    local code="$1"
+    Destructor
+    exit "$code"
+}
+
 Main()
 {
     local cmd=""
@@ -276,13 +293,16 @@ Main()
     source $ASSETS_CONF         # local variables (with CAPITAL letters)
 
     RationalityTests            # check validity of values in $ASSETS_CONF
+
+    Constructor
+
     RunPreHooks                 # may/should update local PKGBUILDs
     Assets_clone                # offer getting assets from github instead of using local ones
 
     case "$cmd" in
         checkaur)
             CompareWithAUR      # Simply compare some packages with AUR. Build nothing.
-            return
+            Exit 0
             ;;
     esac
 
@@ -395,7 +415,7 @@ Main()
         read -p "Continue (Y/n)? " xx
         case "$xx" in
             [yY]*|"") ;;
-            *) return ;;
+            *) Exit 0 ;;
         esac
 
         # Remove old assets (removable) from github and local folder.
@@ -417,6 +437,8 @@ Main()
     else
         echo2 "Nothing to do."
     fi
+
+    Destructor
 }
 
 Main "$@"
