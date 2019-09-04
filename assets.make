@@ -74,11 +74,21 @@ PkgBuildVersion()
 LocalVersion()
 {
     local Pkgname="$1"
+    local pkgs
+    
     Pkgname="$(basename "$Pkgname")"
-    #local pkgdirname="$1"
-    #local Pkgname="$(PkgBuildName "$pkgdirname")"
 
-    local tail="$(ls -1 "$ASSETSDIR"/${Pkgname}-*.pkg.tar.xz 2>/dev/null | sed 's|^.*/'"$Pkgname"'-||')"
+    pkgs="$(ls -1 "$ASSETSDIR"/${Pkgname}-[0-9]*.pkg.tar.xz 2>/dev/null)"
+
+    case "$(echo "$pkgs" | wc -l)" in
+        0) echo "0" ; return ;;
+        1) ;;
+        *) WARN "$Pkgname: there is not only one version locally, using the latest."
+           pkgs="$(echo "$pkgs" | tail -n 1)"
+           ;;
+    esac
+
+    local tail="$(echo "$pkgs" | sed 's|^.*/'"$Pkgname"'-||')"
     local ver="$(echo "$tail" | cut -d '-' -f 1)"
     local rel="$(echo "$tail" | cut -d '-' -f 2)"
 
@@ -107,6 +117,7 @@ ListNameToPkgName()
         pkgname="${xx:4}"
         case "$fetch" in
             yes)
+                rm -rf "$pkgname"
                 yay -Ga "$pkgname" >/dev/null || DIE "'yay -Ga $pkgname' failed."
                 rm -rf "$pkgname"/.git                          # not needed
                 # AUR pkg files may need some changes:
@@ -317,7 +328,7 @@ Main()
     local built=()              # collected
     local signed=()             # collected
     declare -A newv oldv
-    local tmp
+    local tmp tmpcurr
     local xx pkg
     local pkgdirname            # dir name for a package
     local pkgname
@@ -337,10 +348,11 @@ Main()
 
         # get current versions from local asset files
         pkgname="$(PkgBuildName "$pkgdirname")"
-        tmp="$(LocalVersion "$ASSETSDIR/$pkgname")"
-        test -n "$tmp" || DIE "LocalVersion for '$xx' failed"
-        oldv["$pkgdirname"]="$tmp"
-        echo2 "    $pkgdirname"
+        tmpcurr="$(LocalVersion "$ASSETSDIR/$pkgname")"
+        test -n "$tmpcurr" || DIE "LocalVersion for '$xx' failed"
+        oldv["$pkgdirname"]="$tmpcurr"
+        printf2 "    %-25s : " "$pkgdirname"
+        test $(vercmp "$tmp" "$tmpcurr") -gt 0 && echo2 "update pending to $tmp" || echo2 "OK"
     done
     Popd
 
@@ -418,22 +430,22 @@ Main()
             *) Exit 0 ;;
         esac
 
-        # Remove old assets (removable) from github and local folder.
-        if [ -n "$removable" ] ; then
-            rm -f  "${removable[@]}"
-            for tag in "${RELEASE_TAGS[@]}" ; do
-                delete-release-assets "$tag" "${removableassets[@]}" || WARN "removing assets with tag '$tag' failed"
-                sleep 3
-            done
-            sleep 2
-        fi
-
         # transfer assets (built, signed and db) to github
         for tag in "${RELEASE_TAGS[@]}" ; do
             add-release-assets "$tag" \
                                "${built[@]}" "${signed[@]}" "$ASSETSDIR/$REPONAME".{db,files}{,.tar.xz} || \
                 DIE "adding assets with tag 'tag' failed"
         done
+
+        # Remove old assets (removable) from github and local folder.
+        if [ -n "$removable" ] ; then
+            rm -f  "${removable[@]}"
+            sleep 1
+            for tag in "${RELEASE_TAGS[@]}" ; do
+                delete-release-assets "$tag" "${removableassets[@]}" || WARN "removing assets with tag '$tag' failed"
+                sleep 1
+            done
+        fi
     else
         echo2 "Nothing to do."
     fi
