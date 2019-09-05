@@ -139,11 +139,11 @@ Assets_clone()
     # echo2 "If so, you can delete your local assets and fetch assets from github now."
     # read -p "Delete local assets and fetch them from github now (y/N)? " xx >&2
 
-    printf2 "\n%s " "Fetch assets from github (y/N)?"
+    printf2 "\n%s " "Fetch assets from github (Y/n)?"
     read xx
 
     case "$xx" in
-        [yY]*) ;;
+        [yY]*|"") ;;
         *)
             echo2 "Using local assets."
             echo2 ""
@@ -443,7 +443,6 @@ Main()
             sleep 1
             for tag in "${RELEASE_TAGS[@]}" ; do
                 delete-release-assets "$tag" "${removableassets[@]}" || WARN "removing assets with tag '$tag' failed"
-                sleep 1
             done
         fi
     else
