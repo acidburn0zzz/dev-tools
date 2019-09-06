@@ -95,6 +95,16 @@ LocalVersion()
     echo "${ver}-$rel"
 }
 
+JustPkgname()
+{
+    local fakepath="$1"
+    case "$fakepath" in
+        ./*)      echo "${fakepath:2}" ;;
+        aur/*)    echo "${fakepath:4}" ;;
+        *)        echo "${fakepath}"   ;;
+    esac
+}
+
 ListNameToPkgName()
 {
     # PKGNAMES array (from $ASSETS_CONF) uses certain syntax for package names
@@ -110,22 +120,24 @@ ListNameToPkgName()
     local xx="$1"
     local fetch="$2"
     local pkgname
+    local hook
 
-    if [ "${xx::2}" = "./" ] ; then
-        pkgname="${xx:2}"
-    elif [ "${xx::4}" = "aur/" ] ; then
-        pkgname="${xx:4}"
+    pkgname=$(JustPkgname "$xx")
+
+    if [ "${xx::4}" = "aur/" ] ; then
         case "$fetch" in
             yes)
                 rm -rf "$pkgname"
                 yay -Ga "$pkgname" >/dev/null || DIE "'yay -Ga $pkgname' failed."
                 rm -rf "$pkgname"/.git                          # not needed
                 # AUR pkg files may need some changes:
-                test -n "${ASSET_PACKAGE_HOOKS["$pkgname"]}" && "${ASSET_PACKAGE_HOOKS["$pkgname"]}"
+                hook="${ASSET_PACKAGE_HOOKS["$pkgname"]}"
+                test -n "$hook" && {
+                    echo2 -n "hook[$hook] ... "
+                    "$hook"
+                }
                 ;;
         esac
-    else
-        pkgname="${xx}"
     fi
     echo "$pkgname"
 }
@@ -253,10 +265,9 @@ CompareWithAUR()  # compare certain AUR PKGBUILDs to local counterparts
     Pushd "$PKGBUILD_ROOTDIR"
     echo2 "Comparing certain packages to AUR..."
     for xx in "${AUR_PKGNAMES[@]}" ; do
+        printf2 "    %-15s : " "$(JustPkgname "$xx")"
         pkgdirname="$(ListNameToPkgName "$xx" yes)"
         test -n "$pkgdirname" || DIE "converting or fetching '$xx' failed"
-
-        printf2 "    %-15s : " "$pkgdirname"
 
         # get versions from latest AUR PKGBUILDs
         vaur="$(PkgBuildVersion "$PKGBUILD_ROOTDIR/$pkgdirname")"
@@ -338,6 +349,7 @@ Main()
 
     Pushd "$PKGBUILD_ROOTDIR"
     for xx in "${PKGNAMES[@]}" ; do
+        printf2 "    %-25s : " "$(JustPkgname "$xx")"
         pkgdirname="$(ListNameToPkgName "$xx" yes)"
         test -n "$pkgdirname" || DIE "converting or fetching '$xx' failed"
 
@@ -351,7 +363,6 @@ Main()
         tmpcurr="$(LocalVersion "$ASSETSDIR/$pkgname")"
         test -n "$tmpcurr" || DIE "LocalVersion for '$xx' failed"
         oldv["$pkgdirname"]="$tmpcurr"
-        printf2 "    %-25s : " "$pkgdirname"
         test $(vercmp "$tmp" "$tmpcurr") -gt 0 && echo2 "update pending to $tmp" || echo2 "OK"
     done
     Popd
