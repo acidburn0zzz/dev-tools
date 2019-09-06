@@ -144,7 +144,7 @@ ListNameToPkgName()
 
 Assets_clone()
 {
-    local xx
+    local xx hook
 
     # echo2 "It is possible that your local release assets in folder $ASSETSDIR"
     # echo2 "are not in sync with github."
@@ -172,10 +172,10 @@ Assets_clone()
     rm -f "$REPONAME".{db,files}{,.tar.xz,.tar.xz.old}
 
     echo "Fetching all github assets..."
+    hook="${ASSET_PACKAGE_HOOKS["assets_mirrors"]}"
     for xx in "${RELEASE_TAGS[@]}" ; do
         hub release download $xx
-        break
-        # we need assets from only one tag since other tags have the same assets
+        test -n "$hook" && { "$hook" && break ; }  # we need assets from only one tag since assets in other tags are the same
     done
     sleep 3
 

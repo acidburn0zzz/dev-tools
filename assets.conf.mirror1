@@ -85,3 +85,11 @@ _kalu_hook_fix_files() {
 declare -A ASSET_PACKAGE_HOOKS
 ASSET_PACKAGE_HOOKS["yad"]=_yad_hook_add_gspell
 ASSET_PACKAGE_HOOKS["kalu"]=_kalu_hook_fix_files
+
+
+# Special hooks. Implemented via package hooks.
+
+_assets_download_break() {
+    return 0  # same contents under different asset tags, so always break after first download
+}
+ASSET_PACKAGE_HOOKS["assets_mirrors"]=_assets_download_break
