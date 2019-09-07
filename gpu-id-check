@@ -1,6 +1,9 @@
 #!/bin/bash
 
-# Show GPU vendor's name, id and optionally name.
+# Show GPU info:
+#   - vendor name
+#   - GPU id
+#   - GPU model (optional)
 
 declare -A VENDOR_CODES
 VENDOR_CODES["intel"]=8086
