@@ -1,0 +1,27 @@
+#!/bin/bash
+
+GetGraphicsId() {
+    local vendorcode="$1"
+    lspci -n | grep -w -P '0300|0302|0380' | grep $vendorcode: | awk '{print $3}' | cut -d ':' -f 2
+}
+
+GpuId() {
+    case "$1" in
+        intel)  GetGraphicsId 8086 ;;
+        nvidia) GetGraphicsId 10de ;;
+        amd)    GetGraphicsId 1002 ;;
+        *) echo "unknown vendor '$1'" >&2 ;;
+    esac
+}
+
+Main()
+{
+    local id vendor
+
+    for vendor in nvidia intel amd ; do
+        id="$(GpuId $vendor)"
+        test -n "$id" && echo "$vendor $id"
+    done
+}
+
+Main "$@"
