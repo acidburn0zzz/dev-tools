@@ -1,26 +1,102 @@
 #!/bin/bash
 
-GetGraphicsId() {
+# Show GPU vendor's name, id and optionally name.
+
+declare -A VENDOR_CODES
+VENDOR_CODES["intel"]=8086
+VENDOR_CODES["nvidia"]=10de
+VENDOR_CODES["amd"]=1002
+
+declare -A VENDOR_NAMES
+VENDOR_NAMES["8006"]=intel
+VENDOR_NAMES["10de"]=nvidia
+VENDOR_NAMES["1002"]=amd
+
+echo2()   { echo "$@" >&2 ; }
+DIE()     { echo2 "Error: $1" ; exit 1 ; }
+
+# Low level functions:
+_GetGpuName() {  # not used?
+    local vendorcode="$1"
+    lspci -vnn | grep -w -P '0300|0302|0380' | grep $vendorcode: | \
+        sed -e 's|^.* \[[0-9a-f]*\]: ||' -e 's| \[[0-9a-f:]*\].*$||'
+}
+_GetGpuId() {
     local vendorcode="$1"
     lspci -n | grep -w -P '0300|0302|0380' | grep $vendorcode: | awk '{print $3}' | cut -d ':' -f 2
 }
 
-GpuId() {
-    case "$1" in
-        intel)  GetGraphicsId 8086 ;;
-        nvidia) GetGraphicsId 10de ;;
-        amd)    GetGraphicsId 1002 ;;
-        *) echo "unknown vendor '$1'" >&2 ;;
-    esac
+# Middle level functions:
+_GpuInfo() {
+    local vendorcode="$1"
+    local func="$2"
+
+    test -n "$vendorcode" && $func $vendorcode || DIE "unknown vendor code '$vendorcode'"
+}
+
+# High level functions:
+VendorCode() {
+    local vendorname="$1"
+    local code="${VENDOR_CODES["$vendorname"]}"
+
+    test -n "$code" && echo "$code" || DIE "unknown vendor '$vendorname'"
+}
+VendorName() {  # not used?
+    local vendorcode="$1"
+    local name="${VENDOR_NAMES["$vendorcode"]}"
+
+    test -n "$name" && echo "$name" || DIE "unknown vendor code '$vendorcode'"
+}
+GpuId()   { local vendorcode="$1" ; _GpuInfo "$vendorcode" _GetGpuId ; }
+GpuName() { local vendorcode="$1" ; _GpuInfo "$vendorcode" _GetGpuName ; }  # not used?
+
+GetNameFromDB() {
+    local gpuid="$1"
+    local vendorcode="$2"
+
+    local dbfile=/usr/share/hwdata/pci.ids   # package 'hwids'
+    local area="$(cat $dbfile | sed -n '/^'"$vendorcode"'/,/^[0-9a-f]/ p' | head -n -1)"  # only lines for this vendor!
+
+    echo "$area" | grep -w $gpuid | sed 's|^[ \t]*[0-9a-f]*[ \t]*||'
 }
 
 Main()
 {
-    local id vendor
+    local gpuid
+    local vendorname
+    local vendorcode
+    local line
+    local arg="$1"
+    local showname=0
 
-    for vendor in nvidia intel amd ; do
-        id="$(GpuId $vendor)"
-        test -n "$id" && echo "$vendor $id"
+    case "$arg" in
+        "") ;;                    # original behavior!
+
+        -n) showname=1 ;;
+        -xt=*)
+            # internal database testing, for example: -xt=intel:xxxx
+            vendorname="$(echo "${arg:4}" | cut -d ':' -f 1)"
+            gpuid="$(     echo "${arg:4}" | cut -d ':' -f 2)"
+            vendorcode="$(VendorCode "$vendorname")"
+            echo "GPU name: $(GetNameFromDB $gpuid $vendorcode)"
+            return
+            ;;
+
+        *) echo2 "Unsupported option '$arg'"
+           echo2 "Usage: $0 [-n]"
+           echo2 "   -n     Show GPU name too."
+           exit 1
+           ;;
+    esac
+
+    for vendorname in intel nvidia amd ; do
+        vendorcode="$(VendorCode "$vendorname")"
+        gpuid="$(GpuId $vendorcode)"
+        if [ -n "$gpuid" ] ; then
+            line="$vendorname $gpuid"
+            test $showname -eq 1 && line+=" '$(GetNameFromDB $gpuid $vendorcode)'"
+            echo "$line"
+        fi
     done
 }
 
