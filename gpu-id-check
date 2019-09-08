@@ -78,7 +78,7 @@ GetNameFromDB() {
 
 Main()
 {
-    local gpuid
+    local gpuid id
     local vendorname
     local vendorcode
     local line
@@ -113,9 +113,12 @@ Main()
         ASSERT -n "$vendorcode"
         gpuid="$(GpuId $vendorcode)"
         if [ -n "$gpuid" ] ; then
-            line="$vendorname $gpuid"
-            test $showname -eq 1 && line+=" '$(GetNameFromDB $gpuid $vendorcode)'"
-            echo "$line"
+            # There may be more than one id! Thinkpad T60, what's going on?
+            for id in $gpuid ; do
+                line="$vendorname $id"
+                test $showname -eq 1 && line+=" '$(GetNameFromDB $id $vendorcode)'"
+                echo "$line"
+            done
         fi
     done
 }
